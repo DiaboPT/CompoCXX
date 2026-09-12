@@ -1,185 +1,137 @@
-// compocxx/main.cpp
+// file:    compocxx/main.cpp
+// compile: g++ -std=c++20 main.cpp -lglfw -lGL
+// run:     ./a.out
 
-#include "compocxx.hpp"
-
+#include <GLFW/glfw3.h>
 #include <cstdlib>
 #include <iostream>
 
-using std::cout;
-using std::endl;
+#include "compocxx.hpp"
 
-class entity_script : public script {
-public:
-    int health;
-    int damage;
+struct theme {
+    vector3 rosewater;
+    vector3 flamingo;
+    vector3 pink;
+    vector3 mauve;
+    vector3 red;
+    vector3 maroon;
+    vector3 peach;
+    vector3 yellow;
+    vector3 green;
+    vector3 teal;
+    vector3 sky;
+    vector3 sapphire;
+    vector3 blue;
+    vector3 lavender;
 
-    entity_script *target;
+    vector3 text;
 
-    entity_script(int health, int damage)
-    : health(health), damage(damage), target(nullptr) {}
+    vector3 subtext1;
+    vector3 subtext0;
 
-    bool alive() const { return health > 0; }
+    vector3 overlay2;
+    vector3 overlay1;
+    vector3 overlay0;
 
-    void attack() {
-        if (!target || !target->alive())
-            return;
+    vector3 surface2;
+    vector3 surface1;
+    vector3 surface0;
 
-        cout << owner_get()->name_get() << " attacks "
-             << target->owner_get()->name_get() << " for " << damage << " damage!"
-             << endl;
-
-        target->health -= damage;
-
-        if (target->health < 0)
-            target->health = 0;
-
-        cout << target->owner_get()->name_get() << " has " << target->health
-             << " HP remaining." << endl;
-    }
-
-    void start() override {}
-    void update() override {}
+    vector3 base;
+    vector3 mantle;
+    vector3 crust;
 };
 
-class player_script : public entity_script {
-public:
-    player_script(int health, int damage)
-    : entity_script(health, damage) {}
+const theme catppuccin_mocha = {
+    .rosewater = {0.961, 0.878, 0.863},
+    .flamingo  = {0.949, 0.804, 0.804},
+    .pink      = {0.961, 0.761, 0.906},
+    .mauve     = {0.796, 0.651, 0.969},
+    .red       = {0.953, 0.545, 0.659},
+    .maroon    = {0.922, 0.627, 0.675},
+    .peach     = {0.980, 0.702, 0.529},
+    .yellow    = {0.976, 0.886, 0.686},
+    .green     = {0.651, 0.890, 0.631},
+    .teal      = {0.580, 0.886, 0.835},
+    .sky       = {0.537, 0.863, 0.922},
+    .sapphire  = {0.455, 0.780, 0.925},
+    .blue      = {0.537, 0.706, 0.980},
+    .lavender  = {0.706, 0.745, 0.996},
+
+    .text      = {0.804, 0.839, 0.957},
+
+    .subtext1  = {0.729, 0.761, 0.871},
+    .subtext0  = {0.651, 0.678, 0.784},
+
+    .overlay2  = {0.576, 0.600, 0.698},
+    .overlay1  = {0.498, 0.518, 0.612},
+    .overlay0  = {0.424, 0.439, 0.525},
+
+    .surface2  = {0.345, 0.357, 0.439},
+    .surface1  = {0.271, 0.278, 0.353},
+    .surface0  = {0.192, 0.196, 0.267},
+
+    .base      = {0.118, 0.118, 0.180},
+    .mantle    = {0.094, 0.094, 0.145},
+    .crust     = {0.067, 0.067, 0.106},
 };
 
-class opponent_script : public entity_script {
-public:
-    opponent_script(int health, int damage)
-    : entity_script(health, damage) {}
-};
+auto* current_theme = &catppuccin_mocha;
 
-class battle_script : public script {
-private:
-    engine *game;
-    entity_script *player;
-    entity_script *opponent;
+void draw_rect(vector2 position,
+               vector2 size,
+               vector3 color) {
+    glColor3f(color.r, color.g, color.b);
 
-    bool player_turn;
+    glBegin(GL_QUADS);
 
-public:
-    battle_script(engine *game)
-        : game(game), player(nullptr), opponent(nullptr), player_turn(true) {}
+    float x = position.x;
+    float y = position.y;
+    float width = size.x;
+    float height = size.y;
 
-    void start() override {
-        node *battle = owner_get();
+    glVertex2f(x,         y);
+    glVertex2f(x + width, y);
+    glVertex2f(x + width, y + height);
+    glVertex2f(x,         y + height);
 
-        if (!battle)
-            return;
-
-        node *player_node = battle->child_get_by_name("Player");
-
-        node *opponent_node = battle->child_get_by_name("Opponent");
-
-        if (!player_node || !opponent_node)
-            return;
-
-        player = dynamic_cast<entity_script *>(player_node->script_get());
-
-        opponent = dynamic_cast<entity_script *>(opponent_node->script_get());
-
-        if (!player || !opponent)
-            return;
-
-        player->target = opponent;
-        opponent->target = player;
-
-        cout << endl;
-        cout << "============================" << endl;
-        cout << "        BATTLE START        " << endl;
-        cout << "============================" << endl;
-
-        cout << player_node->name_get() << " HP: " << player->health
-             << "  Damage: " << player->damage << endl;
-
-        cout << opponent_node->name_get() << " HP: " << opponent->health
-             << "  Damage: " << opponent->damage << endl;
-
-        cout << "============================" << endl;
-        cout << endl;
-    }
-
-    void update() override {
-        if (!player || !opponent)
-            return;
-
-        if (!player->alive() || !opponent->alive()) {
-            game->stop();
-            return;
-        }
-
-        if (player_turn) {
-            cout << "[Player Turn]" << endl;
-
-            player->attack();
-
-            if (!opponent->alive()) {
-                cout << endl;
-                cout << "Opponent has died!" << endl;
-                cout << "PLAYER WINS!" << endl;
-                return;
-            }
-        } else {
-            cout << "[Opponent Turn]" << endl;
-
-            opponent->attack();
-
-            if (!player->alive()) {
-                cout << endl;
-                cout << "Player has died!" << endl;
-                cout << "OPPONENT WINS!" << endl;
-
-                game->stop();
-                return;
-            }
-        }
-
-        player_turn = !player_turn;
-
-        cout << endl;
-    }
-};
-
-class player_node : public node2d {
-public:
-    player_node() : node2d("Player") {}
-};
-
-class opponent_node : public node2d {
-public:
-    opponent_node() : node2d("Opponent") {}
-};
-
-class battle_node : public node2d {
-public:
-    battle_node() : node2d("Battle") {}
-};
-
-///
+    glEnd();
+}
 
 int main() {
-    engine game("RPG");
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW\n";
+        return EXIT_FAILURE;
+    }
 
-    auto battle = make_unique<battle_node>();
+    GLFWwindow* window =
+        glfwCreateWindow(1280, 720, "CompoCXX Game Engine", nullptr, nullptr);
 
-    auto player = make_unique<player_node>();
-    player->script_set(make_unique<player_script>(100, 20));
+    if (!window) {
+        std::cerr << "Failed to create window\n";
+        glfwTerminate();
+        return EXIT_FAILURE;
+    }
 
-    auto opponent = make_unique<opponent_node>();
-    opponent->script_set(make_unique<opponent_script>(80, 15));
+    glfwMakeContextCurrent(window);
 
-    battle->child_add(std::move(player));
-    battle->child_add(std::move(opponent));
+    while (!glfwWindowShouldClose(window)) {
+        glClearColor(current_theme->base.r,
+                     current_theme->base.g,
+                     current_theme->base.b,
+                     1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-    battle->script_set(make_unique<battle_script>(&game));
+        draw_rect({-0.5f, -0.5f},
+                  { 1.0f,  1.0f},
+                  current_theme->overlay0);
 
-    game.root_set(std::move(battle));
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
 
-    game.run();
+    glfwDestroyWindow(window);
+    glfwTerminate();
 
     return EXIT_SUCCESS;
 }
