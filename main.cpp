@@ -1,218 +1,183 @@
-#include <cstddef>
+// compocxx/main.cpp
+
+#include "compocxx.hpp"
+
+#include <cstdlib>
 #include <iostream>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
 
 using std::cout;
 using std::endl;
-using std::make_unique;
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
-class meta_data;
-class behaviour;
-class node;
-class engine;
-
-static size_t global_uid = 0;
-
-class vector2 {
+class entity_script : public script {
 public:
-    float x, y;
+    int health;
+    int damage;
+
+    entity_script *target;
+
+    entity_script(int health, int damage)
+        : health(health), damage(damage), target(nullptr) {}
+
+    bool alive() const { return health > 0; }
+
+    void attack() {
+        if (!target || !target->alive())
+        return;
+
+        cout << owner_get()->name_get() << " attacks "
+             << target->owner_get()->name_get() << " for " << damage << " damage!"
+             << endl;
+
+        target->health -= damage;
+
+        if (target->health < 0)
+        target->health = 0;
+
+        cout << target->owner_get()->name_get() << " has " << target->health
+             << " HP remaining." << endl;
+    }
+
+    void start() override {}
+    void update() override {}
 };
 
-class meta_data {
+class player_script : public entity_script {
+public:
+    player_script(int health, int damage) : entity_script(health, damage) {}
+};
+
+class opponent_script : public entity_script {
+public:
+    opponent_script(int health, int damage) : entity_script(health, damage) {}
+};
+
+class battle_script : public script {
 private:
-    size_t uid;
-    string name;
-    bool is_active;
+    engine *game;
+    entity_script *player;
+    entity_script *opponent;
+
+    bool player_turn;
 
 public:
-    size_t uid_get() const {
-        return uid;
+    battle_script(engine *game)
+        : game(game), player(nullptr), opponent(nullptr), player_turn(true) {}
+
+    void start() override {
+        node *battle = owner_get();
+
+        if (!battle)
+        return;
+
+        node *player_node = battle->child_get_by_name("Player");
+
+        node *opponent_node = battle->child_get_by_name("Opponent");
+
+        if (!player_node || !opponent_node)
+        return;
+
+        player = dynamic_cast<entity_script *>(player_node->script_get());
+
+        opponent = dynamic_cast<entity_script *>(opponent_node->script_get());
+
+        if (!player || !opponent)
+        return;
+
+        player->target = opponent;
+        opponent->target = player;
+
+        cout << endl;
+        cout << "============================" << endl;
+        cout << "        BATTLE START        " << endl;
+        cout << "============================" << endl;
+
+        cout << player_node->name_get() << " HP: " << player->health
+             << "  Damage: " << player->damage << endl;
+
+        cout << opponent_node->name_get() << " HP: " << opponent->health
+             << "  Damage: " << opponent->damage << endl;
+
+        cout << "============================" << endl;
+        cout << endl;
     }
 
-    const string& name_get() const {
-        return name;
-    }
-    void name_set(const string& new_name) {
-        name = new_name;
-    }
+    void update() override {
+        if (!player || !opponent)
+        return;
 
-    bool active_get() const {
-        return is_active;
-    }
-    void active_set(bool new_active) {
-        is_active = new_active;
-    }
-
-    meta_data(const string& new_name)
-    : uid(global_uid++),
-    name(new_name),
-    is_active(true) {}
-};
-
-class behaviour {
-public:
-    virtual void start() = 0;
-    virtual void update() = 0;
-    virtual ~behaviour() = default;
-};
-
-class node {
-private:
-    meta_data meta;
-
-    node* parent;
-    vector<unique_ptr<node>> children;
-
-    unique_ptr<behaviour> script;
-
-public:
-    size_t uid_get() const {
-        return meta.uid_get();
-    }
-
-    const string& name_get() const {
-        return meta.name_get();
-    }
-    void name_set(const string& new_name) {
-        meta.name_set(new_name);
-    }
-
-    bool active_get() const {
-        return meta.active_get();
-    }
-    void active_set(bool new_active) {
-        meta.active_set(new_active);
-    }
-
-    node* parent_get() const {
-        return parent;
-    }
-
-    size_t child_count() const {
-        return children.size();
-    }
-    node* child_get_by_id(size_t id) const {
-        for (const auto& child : children) {
-            if (child->uid_get() == id) {
-                return child.get();
-            }
+        if (!player->alive() || !opponent->alive()) {
+        game->stop();
+        return;
         }
-        return nullptr;
-    }
-    void child_add(unique_ptr<node> child) {
-        if (!child)
+
+        if (player_turn) {
+        cout << "[Player Turn]" << endl;
+
+        player->attack();
+
+        if (!opponent->alive()) {
+            cout << endl;
+            cout << "Opponent has died!" << endl;
+            cout << "PLAYER WINS!" << endl;
             return;
-
-        child->parent = this;
-        children.push_back(std::move(child));
-    }
-    unique_ptr<node> child_remove_by_id(size_t id) {
-        for (auto it = children.begin(); it != children.end(); ++it) {
-            if ((*it)->uid_get() == id) {
-                unique_ptr<node> removed = std::move(*it);
-                children.erase(it);
-
-                removed->parent = nullptr;
-
-                return removed;
-            }
         }
-        return nullptr;
-    }
+        } else {
+        cout << "[Opponent Turn]" << endl;
 
-    behaviour* script_get() const {
-        return script.get();
-    }
-    void script_set(unique_ptr<behaviour> new_script) {
-        script = std::move(new_script);
-    }
+        opponent->attack();
 
-    node(const string& name)
-    : meta(name),
-    parent(nullptr),
-    children(),
-    script(nullptr) {}
-    virtual ~node() = default;
+        if (!player->alive()) {
+            cout << endl;
+            cout << "Player has died!" << endl;
+            cout << "OPPONENT WINS!" << endl;
+
+            game->stop();
+            return;
+        }
+        }
+
+        player_turn = !player_turn;
+
+        cout << endl;
+    }
 };
 
-class engine {
-private:
-    meta_data meta;
-    unique_ptr<node> root;
-
+class player_node : public node2d {
 public:
-    node* root_get() const {
-        return root.get();
-    }
-    void root_set(unique_ptr<node> new_root) {
-        root = std::move(new_root);
-    }
+    player_node() : node2d("Player") {}
+};
 
-    engine(const string& name)
-    : meta(name),
-    root(nullptr)
-    {}
+class opponent_node : public node2d {
+public:
+    opponent_node() : node2d("Opponent") {}
+};
+
+class battle_node : public node2d {
+public:
+    battle_node() : node2d("Battle") {}
 };
 
 ///
-
-// engine prefabs
-class node2d;
-class sprite;
-
-class node2d : public node {
-public:
-    vector2 position;
-
-    node2d(const string& name = "Node2D")
-    : node(name),
-    position{0.0f, 0.0f}
-    {}
-
-    virtual ~node2d() = default;
-};
-
-class sprite : public node2d {
-public:
-    vector<vector<char>> pixels;
-
-    sprite(const string& name = "Sprite") : node2d(name) {}
-};
-
-// game prefabs
-class player;
-
-class player : public node2d {
-public:
-    player() : node2d("Player") {
-        child_add(make_unique<sprite>());
-    }
-};
-
 
 int main() {
-    engine game("Dungeon RPG");
+    engine game("RPG");
 
-    auto game_manager = make_unique<node>("Game Manager");
-    auto level = make_unique<node>("Level 01");
-    auto player = make_unique<player>();
+    auto battle = make_unique<battle_node>();
 
-    level->child_add(std::move(player));
-    game_manager->child_add(std::move(level));
+    auto player = make_unique<player_node>();
+    player->script_set(make_unique<player_script>(100, 20));
 
-    game.root_set(std::move(game_manager));
+    auto opponent = make_unique<opponent_node>();
+    opponent->script_set(make_unique<opponent_script>(80, 15));
 
-    ///
+    battle->child_add(std::move(player));
+    battle->child_add(std::move(opponent));
 
-    cout << endl << endl << "Hello World!" << endl << endl;
-    return 0;
+    battle->script_set(make_unique<battle_script>(&game));
+
+    game.root_set(std::move(battle));
+
+    game.run();
+
+    return EXIT_SUCCESS;
 }
-
-
-///
