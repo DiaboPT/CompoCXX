@@ -16,13 +16,13 @@ public:
     entity_script *target;
 
     entity_script(int health, int damage)
-        : health(health), damage(damage), target(nullptr) {}
+    : health(health), damage(damage), target(nullptr) {}
 
     bool alive() const { return health > 0; }
 
     void attack() {
         if (!target || !target->alive())
-        return;
+            return;
 
         cout << owner_get()->name_get() << " attacks "
              << target->owner_get()->name_get() << " for " << damage << " damage!"
@@ -31,7 +31,7 @@ public:
         target->health -= damage;
 
         if (target->health < 0)
-        target->health = 0;
+            target->health = 0;
 
         cout << target->owner_get()->name_get() << " has " << target->health
              << " HP remaining." << endl;
@@ -43,12 +43,14 @@ public:
 
 class player_script : public entity_script {
 public:
-    player_script(int health, int damage) : entity_script(health, damage) {}
+    player_script(int health, int damage)
+    : entity_script(health, damage) {}
 };
 
 class opponent_script : public entity_script {
 public:
-    opponent_script(int health, int damage) : entity_script(health, damage) {}
+    opponent_script(int health, int damage)
+    : entity_script(health, damage) {}
 };
 
 class battle_script : public script {
@@ -67,21 +69,21 @@ public:
         node *battle = owner_get();
 
         if (!battle)
-        return;
+            return;
 
         node *player_node = battle->child_get_by_name("Player");
 
         node *opponent_node = battle->child_get_by_name("Opponent");
 
         if (!player_node || !opponent_node)
-        return;
+            return;
 
         player = dynamic_cast<entity_script *>(player_node->script_get());
 
         opponent = dynamic_cast<entity_script *>(opponent_node->script_get());
 
         if (!player || !opponent)
-        return;
+            return;
 
         player->target = opponent;
         opponent->target = player;
@@ -103,37 +105,37 @@ public:
 
     void update() override {
         if (!player || !opponent)
-        return;
+            return;
 
         if (!player->alive() || !opponent->alive()) {
-        game->stop();
-        return;
-        }
-
-        if (player_turn) {
-        cout << "[Player Turn]" << endl;
-
-        player->attack();
-
-        if (!opponent->alive()) {
-            cout << endl;
-            cout << "Opponent has died!" << endl;
-            cout << "PLAYER WINS!" << endl;
-            return;
-        }
-        } else {
-        cout << "[Opponent Turn]" << endl;
-
-        opponent->attack();
-
-        if (!player->alive()) {
-            cout << endl;
-            cout << "Player has died!" << endl;
-            cout << "OPPONENT WINS!" << endl;
-
             game->stop();
             return;
         }
+
+        if (player_turn) {
+            cout << "[Player Turn]" << endl;
+
+            player->attack();
+
+            if (!opponent->alive()) {
+                cout << endl;
+                cout << "Opponent has died!" << endl;
+                cout << "PLAYER WINS!" << endl;
+                return;
+            }
+        } else {
+            cout << "[Opponent Turn]" << endl;
+
+            opponent->attack();
+
+            if (!player->alive()) {
+                cout << endl;
+                cout << "Player has died!" << endl;
+                cout << "OPPONENT WINS!" << endl;
+
+                game->stop();
+                return;
+            }
         }
 
         player_turn = !player_turn;
