@@ -18,9 +18,36 @@ class engine;
 
 static size_t global_uid = 0;
 
-class vector2 {
-public:
-    float x, y;
+struct vector2 {
+    union {
+        struct {
+            float x, y;
+        };
+    };
+};
+
+struct vector3 {
+    union {
+        struct {
+            float x, y, z;
+        };
+
+        struct {
+            float r, g, b;
+        };
+    };
+};
+
+struct vector4 {
+    union {
+        struct {
+            float x, y, z, w;
+        };
+
+        struct {
+            float r, g, b, a;
+        };
+    };
 };
 
 class meta_data {
